@@ -2,7 +2,9 @@
 set -euo pipefail
 
 # Initialize firewall (runs as root via sudo)
-if ! sudo /usr/local/bin/init-firewall.sh 2>/dev/null; then
+if [[ "${NO_FIREWALL:-false}" == "true" ]]; then
+    echo "Firewall disabled via --no-firewall flag." >&2
+elif ! sudo /usr/local/bin/init-firewall.sh 2>/dev/null; then
     echo "WARNING: Firewall init failed (missing NET_ADMIN capability?). Running without network restrictions." >&2
 fi
 

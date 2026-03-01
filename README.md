@@ -1,31 +1,38 @@
-# Claude Code Dev Container
+# JBVK AI Agent Dev Containers
 
-A Podman container for running [Claude Code](https://claude.ai/code) as a sandboxed AI agent. Claude Code edits your real project files via a bind mount, but is restricted from accessing anything outside the mounted directory. A built-in firewall limits network access to only the services Claude Code needs.
+Sandboxed [Podman](https://podman.io/) containers for running AI coding agents. Each container isolates the agent's file access to your current working directory and restricts network access with an iptables firewall.
 
-## Why use this?
+## Available Containers
 
-- **File sandboxing** — Claude Code can only see and modify files in the directory you launch from. It cannot access your home directory, other projects, or system files.
-- **Network restrictions** — An iptables firewall blocks all outbound traffic except whitelisted domains (Anthropic APIs, npm, GitHub, PyPI, Go modules). Claude Code cannot make arbitrary HTTP requests.
-- **Reproducible environment** — A consistent Linux environment with Node.js, Python, and Go pre-installed, regardless of your host setup.
-- **Persistent auth** — Log in once. Your credentials are stored in a named Podman volume and survive container rebuilds.
-- **Easy cleanup** — Containers are removed on exit (`--rm`). No leftover state on your host beyond the config volume and your project files.
+| Container | Agent | Description |
+|-----------|-------|-------------|
+| [Claude](./Claude/) | [Claude Code](https://claude.ai/code) | Anthropic's AI coding agent |
+| [kiro-cli](./kiro-cli/) | [Kiro CLI](https://kiro.dev/cli/) | AWS-powered AI coding agent |
+
+## What these containers do
+
+- **File sandboxing** — The agent can only read and write files in the directory you launch from. Your home directory, system files, and other projects are not accessible.
+- **Network firewall** — Outbound traffic is restricted to the APIs and registries the agent needs (Anthropic/AWS APIs, npm, GitHub, PyPI, Go modules). Arbitrary HTTP requests are blocked.
+- **Persistent credentials** — Authentication is stored in named Podman volumes. Log in once, and it persists across container rebuilds.
+- **Clean ephemeral containers** — Containers are removed on exit. No leftover state beyond your project files and the credential volume.
+- **Polyglot dev environment** — Each container comes with Node.js 20, Python 3, Go, git, and common CLI tools pre-installed.
 
 ## Security disclaimer
 
-This container adds a layer of isolation, but **we do not guarantee its security**. Specifically:
+These containers add a layer of isolation, but **we do not guarantee their security**.
 
-- The firewall is based on DNS resolution at container startup. IP addresses can change, and DNS-based filtering has known limitations.
-- The container runs with `NET_ADMIN` and `NET_RAW` capabilities, which expand the container's privileges beyond the default.
-- Bind-mounting your project directory gives Claude Code full read/write access to everything in that directory.
-- This is not a substitute for reviewing AI-generated changes before committing them.
-- Use at your own risk. This project is provided as-is, without warranty of any kind.
+- Firewalls are based on IP whitelisting, which has inherent limitations (IP changes, CDN overlap, etc.)
+- Containers run with `NET_ADMIN` and `NET_RAW` capabilities for firewall setup
+- Bind-mounting your project directory gives the agent full read/write access to that directory
+- The Kiro CLI container whitelists all AWS IP ranges, which is a broad allowlist
+- These containers are not a substitute for reviewing AI-generated code changes before committing them
+- **Use at your own risk. This project is provided as-is, without warranty of any kind.**
 
 ## Prerequisites
 
 - [Podman](https://podman.io/) installed and running
-- A Claude Code account (Pro, Max, Team, or Enterprise plan, or API credits)
 
-### Installing Podman on macOS
+### macOS
 
 ```bash
 brew install podman
@@ -35,132 +42,54 @@ podman machine start
 
 ## Quick start
 
-```bash
-# Navigate to any project directory
-cd ~/my-project
-
-# Run Claude Code in a container
-/path/to/run.sh
-```
-
-The image builds automatically on first run. On subsequent runs it starts immediately.
-
-## Usage
+Each container has its own `run.sh` script. Navigate to any project directory and run:
 
 ```bash
-# Interactive mode (default)
-./run.sh
+# Claude Code
+/path/to/Claude/run.sh
 
-# Force rebuild the image
-./run.sh --build
-
-# Headless mode — pass a prompt directly
-./run.sh -p "refactor the auth module to use JWT"
-
-# Drop into a bash shell inside the container
-./run.sh --shell
+# Kiro CLI
+/path/to/kiro-cli/run.sh
 ```
 
-### First-time setup
+The image builds automatically on first run. See each container's README for authentication setup and full usage details.
 
-The first time you run the container, Claude Code will ask you to log in:
+## Common flags
 
-1. Run `./run.sh`
-2. Follow the login prompts (OAuth flow)
-3. Your credentials are saved in the `claude-code-config` Podman volume
-4. All future runs will use the saved credentials automatically
+All containers support the same flags:
 
-## What's in the container
+| Flag | Description |
+|------|-------------|
+| `--build` | Force rebuild the container image |
+| `--shell` | Drop into a bash shell instead of the agent |
+| `-p "prompt"` | Run in headless mode with a prompt |
+| `--no-firewall` | Disable the network firewall |
 
-| Tool | Version |
-|------|---------|
-| Node.js | 20.x |
-| Python | 3.x |
-| Go | 1.22.5 |
-| git | Latest from apt |
-| Claude Code | Latest (configurable) |
-| Editors | nano, vim |
-| Utilities | curl, jq, fzf, unzip |
-
-## How it works
-
-### File access
-
-Your current working directory is mounted to `/workspace` inside the container. Any changes Claude Code makes appear on your host immediately, and vice versa. Nothing outside that directory is accessible.
-
-### Network firewall
-
-On startup, the container resolves a whitelist of domains to IP addresses and configures iptables rules:
-
-**Allowed:**
-- Anthropic APIs (`api.anthropic.com`, `claude.ai`)
-- npm registry (`registry.npmjs.org`)
-- GitHub (`github.com`, `api.github.com`, `raw.githubusercontent.com`)
-- PyPI (`pypi.org`, `files.pythonhosted.org`)
-- Go modules (`proxy.golang.org`, `sum.golang.org`)
-- Docker Hub, Google downloads
-
-**Blocked:** Everything else.
-
-### Credential persistence
-
-Claude Code stores credentials in two locations:
-- `~/.claude/` — stored in the `claude-code-config` named volume
-- `~/.claude.json` — automatically symlinked into the volume by the entrypoint script
-
-Both persist across container restarts and image rebuilds.
-
-## Customization
-
-### Pin a specific Claude Code version
-
-```bash
-podman build --build-arg CLAUDE_CODE_VERSION=2.1.63 -t claude-code-dev .
-```
-
-### Pin a specific Go version
-
-```bash
-podman build --build-arg GO_VERSION=1.23.0 -t claude-code-dev .
-```
-
-### Add domains to the firewall whitelist
-
-Edit `init-firewall.sh` and add domains to the `ALLOWED_DOMAINS` array, then rebuild:
-
-```bash
-./run.sh --build
-```
-
-## File structure
+## Project structure
 
 ```
-Dockerfile         — Container image definition
-entrypoint.sh      — Startup script (firewall init + credential persistence)
-init-firewall.sh   — iptables/ipset firewall configuration
-run.sh             — Host-side launch script
-CLAUDE.md          — Instructions for Claude Code when working in this repo
+Claude/            — Claude Code dev container
+  Dockerfile
+  entrypoint.sh
+  init-firewall.sh
+  run.sh
+kiro-cli/          — Kiro CLI dev container
+  Dockerfile
+  entrypoint.sh
+  init-firewall.sh
+  run.sh
 ```
 
-## Troubleshooting
+## Contributing
 
-### "Firewall init failed" warning
+Contributions are welcome. Each container follows the same pattern:
 
-The container needs `NET_ADMIN` and `NET_RAW` capabilities for the firewall. The `run.sh` script adds these automatically. If you run the container manually, include `--cap-add=NET_ADMIN --cap-add=NET_RAW`.
+1. `Dockerfile` — Image definition with tools and the agent installed
+2. `entrypoint.sh` — Startup logic (firewall, auth persistence)
+3. `init-firewall.sh` — iptables/ipset firewall rules
+4. `run.sh` — Host-side launch script with flag parsing
 
-### Credentials not persisting
-
-Check that the volume exists:
-
-```bash
-podman volume inspect claude-code-config
-```
-
-If it's missing, run `./run.sh` and log in again. The volume is created automatically.
-
-### Permission errors during build
-
-If `npm install -g` fails with `EACCES`, ensure the Dockerfile runs that step as root (before the `USER node` directive).
+To add a new agent container, copy an existing one and adapt the install steps, firewall whitelist, and credential persistence for the new agent.
 
 ## License
 

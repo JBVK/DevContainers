@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE_NAME="claude-code-dev"
-CONTAINER_CONFIG_VOLUME="claude-code-config"
+IMAGE_NAME="kiro-cli-dev"
+CONTAINER_DATA_VOLUME="kiro-cli-data"
+CONTAINER_CONFIG_VOLUME="kiro-cli-config"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BUILD=false
 PROMPT=""
 SHELL_MODE=false
+NO_FIREWALL=false
 EXTRA_ARGS=()
 
 # Parse arguments
@@ -25,6 +27,10 @@ while [[ $# -gt 0 ]]; do
             SHELL_MODE=true
             shift
             ;;
+        --no-firewall)
+            NO_FIREWALL=true
+            shift
+            ;;
         *)
             EXTRA_ARGS+=("$1")
             shift
@@ -38,14 +44,16 @@ if [[ "$BUILD" == true ]] || ! podman image inspect "$IMAGE_NAME" &>/dev/null; t
     podman build -t "$IMAGE_NAME" "$SCRIPT_DIR"
 fi
 
-# Assemble docker run arguments
+# Assemble podman run arguments
 RUN_ARGS=(
     --rm
     -it
     -v "$(pwd):/workspace"
-    -v "${CONTAINER_CONFIG_VOLUME}:/home/node/.claude"
+    -v "${CONTAINER_DATA_VOLUME}:/home/node/.local/share/kiro-cli"
+    -v "${CONTAINER_CONFIG_VOLUME}:/home/node/.kiro"
     --cap-add=NET_ADMIN
     --cap-add=NET_RAW
+    -e "NO_FIREWALL=${NO_FIREWALL}"
     -w /workspace
 )
 
@@ -53,7 +61,7 @@ RUN_ARGS=(
 if [[ "$SHELL_MODE" == true ]]; then
     RUN_ARGS+=("$IMAGE_NAME" /bin/bash)
 elif [[ -n "$PROMPT" ]]; then
-    RUN_ARGS+=("$IMAGE_NAME" claude --dangerously-skip-permissions -p "$PROMPT")
+    RUN_ARGS+=("$IMAGE_NAME" kiro-cli chat -p "$PROMPT")
 else
     RUN_ARGS+=("$IMAGE_NAME" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
 fi
