@@ -54,7 +54,7 @@ The image builds automatically on first run. On subsequent runs it starts immedi
 # Force rebuild the image
 ./run.sh --build
 
-# Headless mode — pass a prompt directly
+# Headless mode — pass a prompt directly (see note below)
 ./run.sh -p "refactor the auth module to use JWT"
 
 # Drop into a bash shell inside the container
@@ -63,6 +63,8 @@ The image builds automatically on first run. On subsequent runs it starts immedi
 # Disable the network firewall
 ./run.sh --no-firewall
 ```
+
+**Note on headless mode (`-p`):** This flag passes `--dangerously-skip-permissions` to Claude Code, which allows it to execute commands and modify files without interactive confirmation. Only use this with prompts you trust.
 
 ### First-time setup
 
@@ -75,15 +77,20 @@ The first time you run the container, Claude Code will ask you to log in:
 
 ## What's in the container
 
-| Tool | Version |
-|------|---------|
-| Node.js | 20.x |
-| Python | 3.x |
-| Go | 1.22.5 |
-| git | Latest from apt |
-| Claude Code | Latest (configurable) |
-| Editors | nano, vim |
-| Utilities | curl, jq, fzf, unzip |
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Node.js | 20.x | Runtime for Claude Code |
+| Python | 3.x | General development |
+| Go | 1.22.5 | General development |
+| uv / uvx | Latest | Run AWS MCP servers |
+| AWS CLI | Latest | AWS credentials and API access |
+| Azure CLI | Latest | Azure credentials and API access |
+| Google Cloud CLI | Latest | GCP credentials and API access |
+| Graphviz | Latest from apt | Diagram rendering (for aws-diagram MCP server) |
+| git | Latest from apt | Version control |
+| Claude Code | Latest (configurable) | AI coding agent |
+| Editors | nano, vim | File editing |
+| Utilities | curl, jq, fzf, unzip | General tooling |
 
 ## How it works
 
@@ -136,6 +143,77 @@ Edit `init-firewall.sh` and add domains to the `ALLOWED_DOMAINS` array, then reb
 ```bash
 ./run.sh --build
 ```
+
+### Allow additional domains at runtime
+
+If you need to reach a domain that the firewall blocks during a session, you have two options:
+
+**Option 1: Disable the firewall for this session**
+
+```bash
+./run.sh --no-firewall
+```
+
+Then add the domain to `init-firewall.sh` for future sessions and rebuild with `./run.sh --build`.
+
+**Option 2: Make it permanent**
+
+Add the domain to the `ALLOWED_DOMAINS` array in `init-firewall.sh` and rebuild:
+
+```bash
+# Edit init-firewall.sh, add your domain to the array, then:
+./run.sh --build
+```
+
+## MCP servers
+
+[MCP (Model Context Protocol)](https://modelcontextprotocol.io/) servers extend Claude Code with additional tools. There are two types: **stdio servers** (run as a local process inside the container) and **remote servers** (HTTP endpoints Claude Code connects to).
+
+### Project-level MCP servers
+
+Create a `.mcp.json` file in your project root. Since your project is bind-mounted, Claude Code picks it up automatically.
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+    },
+    "remote-api": {
+      "type": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+### User-level MCP servers
+
+Use the CLI inside the container:
+
+```bash
+# Add a stdio server
+claude mcp add --scope user --transport stdio my-server -- npx -y some-package
+
+# Add a remote HTTP server
+claude mcp add --scope user --transport http my-api https://mcp.example.com/mcp
+
+# List configured servers
+claude mcp list
+```
+
+User-level servers are stored in `~/.claude.json`, which is persisted in the config volume.
+
+### Container considerations
+
+- **Stdio servers** run as child processes inside the container. The binary or npm package must be available — `npx -y` will download on first use, or you can pre-install in the Dockerfile.
+- **Remote servers** need their domain whitelisted in the firewall. Add it to `init-firewall.sh` and rebuild, or use `--no-firewall`.
+- **Environment variables** referenced in MCP configs (e.g., `${API_TOKEN}`) must be set inside the container. Pass them via `run.sh` or set them in the shell.
+- **File paths** in MCP server args must use container paths (e.g., `/workspace`, not your host path).
 
 ## File structure
 

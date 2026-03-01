@@ -25,6 +25,7 @@ These containers add a layer of isolation, but **we do not guarantee their secur
 - Containers run with `NET_ADMIN` and `NET_RAW` capabilities for firewall setup
 - Bind-mounting your project directory gives the agent full read/write access to that directory
 - The Kiro CLI container whitelists all AWS IP ranges, which is a broad allowlist
+- Headless mode (`-p`) grants the agent unrestricted permissions to execute commands and modify files without confirmation
 - These containers are not a substitute for reviewing AI-generated code changes before committing them
 - **Use at your own risk. This project is provided as-is, without warranty of any kind.**
 
@@ -64,6 +65,41 @@ All containers support the same flags:
 | `--shell` | Drop into a bash shell instead of the agent |
 | `-p "prompt"` | Run in headless mode with a prompt |
 | `--no-firewall` | Disable the network firewall |
+
+## Shell aliases
+
+Add these to your `~/.zshrc` or `~/.bashrc` to run the agents from any directory. Replace the path with where you cloned this repo.
+
+```bash
+# AI Agent Dev Containers — update this path to where you cloned the repo
+DEVCONTAINERS="$HOME/DevContainers"
+
+# Claude Code
+alias agentClaude="$DEVCONTAINERS/Claude/run.sh"
+alias agentClaudeShell="$DEVCONTAINERS/Claude/run.sh --shell"
+alias agentClaudeBuild="$DEVCONTAINERS/Claude/run.sh --build"
+
+# Kiro CLI
+alias agentKiro="$DEVCONTAINERS/kiro-cli/run.sh"
+alias agentKiroShell="$DEVCONTAINERS/kiro-cli/run.sh --shell"
+alias agentKiroBuild="$DEVCONTAINERS/kiro-cli/run.sh --build"
+```
+
+Then reload your shell:
+
+```bash
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+**Usage:**
+
+```bash
+cd ~/my-project
+agentClaude                          # Start Claude Code
+agentKiro                            # Start Kiro CLI
+agentClaude -p "fix the tests"       # Headless mode
+agentKiroShell                       # Shell into the Kiro container
+```
 
 ## Project structure
 

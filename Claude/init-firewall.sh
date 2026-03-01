@@ -32,6 +32,10 @@ ALLOWED_DOMAINS=(
     sum.golang.org
     storage.googleapis.com
 
+    # uv / uvx (Python package manager for MCP servers)
+    astral.sh
+    github.com/astral-sh
+
     # General
     dl.google.com
     registry-1.docker.io

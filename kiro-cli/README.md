@@ -80,15 +80,20 @@ Your credentials are saved in the `kiro-cli-data` Podman volume and persist acro
 
 ## What's in the container
 
-| Tool | Version |
-|------|---------|
-| Node.js | 20.x |
-| Python | 3.x |
-| Go | 1.22.5 |
-| git | Latest from apt |
-| Kiro CLI | Latest |
-| Editors | nano, vim |
-| Utilities | curl, jq, fzf, unzip |
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Node.js | 20.x | Runtime for npm-based tools |
+| Python | 3.x | General development |
+| Go | 1.22.5 | General development |
+| uv / uvx | Latest | Run AWS MCP servers |
+| AWS CLI | Latest | AWS credentials and API access |
+| Azure CLI | Latest | Azure credentials and API access |
+| Google Cloud CLI | Latest | GCP credentials and API access |
+| Graphviz | Latest from apt | Diagram rendering (for aws-diagram MCP server) |
+| git | Latest from apt | Version control |
+| Kiro CLI | Latest | AI coding agent |
+| Editors | nano, vim | File editing |
+| Utilities | curl, jq, fzf, unzip | General tooling |
 
 ## How it works
 
@@ -134,13 +139,73 @@ Both persist across container restarts and image rebuilds.
 podman build --build-arg GO_VERSION=1.23.0 -t kiro-cli-dev .
 ```
 
-### Add domains to the firewall whitelist
+### Allow additional domains
 
-Edit `init-firewall.sh` and add domains to the `ALLOWED_DOMAINS` array, then rebuild:
+If you need to reach a domain that the firewall blocks, you have two options:
+
+**Option 1: Disable the firewall for this session**
 
 ```bash
+./run.sh --no-firewall
+```
+
+Then add the domain to `init-firewall.sh` for future sessions and rebuild with `./run.sh --build`.
+
+**Option 2: Make it permanent**
+
+Add the domain to the `ALLOWED_DOMAINS` array in `init-firewall.sh` and rebuild:
+
+```bash
+# Edit init-firewall.sh, add your domain to the array, then:
 ./run.sh --build
 ```
+
+## MCP servers
+
+[MCP (Model Context Protocol)](https://modelcontextprotocol.io/) servers extend Kiro CLI with additional tools. There are two types: **stdio servers** (run as a local process inside the container) and **remote servers** (HTTP endpoints Kiro connects to).
+
+### Workspace-level MCP servers
+
+Create `.kiro/settings/mcp.json` in your project root. Since your project is bind-mounted, Kiro CLI picks it up automatically.
+
+```json
+{
+  "mcpServers": {
+    "web-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-bravesearch"],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      }
+    },
+    "remote-api": {
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${API_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+### User-level MCP servers
+
+Create or edit `~/.kiro/settings/mcp.json` inside the container (persisted in the `kiro-cli-config` volume):
+
+```bash
+./run.sh --shell
+mkdir -p ~/.kiro/settings
+nano ~/.kiro/settings/mcp.json
+```
+
+Use the same JSON format as workspace-level. User-level servers apply across all projects.
+
+### Container considerations
+
+- **Stdio servers** run as child processes inside the container. The binary or npm package must be available — `npx -y` will download on first use, or you can pre-install in the Dockerfile.
+- **Remote servers** need network access to their endpoint. The firewall already allows all AWS IP ranges. For non-AWS endpoints, add the domain to `init-firewall.sh` and rebuild, or use `--no-firewall`.
+- **Environment variables** referenced in MCP configs (e.g., `${BRAVE_API_KEY}`) must be set inside the container. Pass them via `run.sh` or set them in the shell.
+- **File paths** in MCP server args must use container paths (e.g., `/workspace`, not your host path).
 
 ## File structure
 
