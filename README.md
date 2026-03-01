@@ -6,7 +6,7 @@ Sandboxed [Podman](https://podman.io/) containers for running AI coding agents. 
 
 | Container | Agent | Description |
 |-----------|-------|-------------|
-| [Claude](./Claude/) | [Claude Code](https://claude.ai/code) | Anthropic's AI coding agent |
+| [Claude](./claude-code/) | [Claude Code](https://claude.ai/code) | Anthropic's AI coding agent |
 | [kiro-cli](./kiro-cli/) | [Kiro CLI](https://kiro.dev/cli/) | AWS-powered AI coding agent |
 
 ## What these containers do
@@ -47,7 +47,7 @@ Each container has its own `run.sh` script. Navigate to any project directory an
 
 ```bash
 # Claude Code
-/path/to/Claude/run.sh
+/path/to/claude-code/run.sh
 
 # Kiro CLI
 /path/to/kiro-cli/run.sh
@@ -75,9 +75,9 @@ Add these to your `~/.zshrc` or `~/.bashrc` to run the agents from any directory
 DEVCONTAINERS="$HOME/DevContainers"
 
 # Claude Code
-alias agentClaude="$DEVCONTAINERS/Claude/run.sh"
-alias agentClaudeShell="$DEVCONTAINERS/Claude/run.sh --shell"
-alias agentClaudeBuild="$DEVCONTAINERS/Claude/run.sh --build"
+alias agentClaude="$DEVCONTAINERS/claude-code/run.sh"
+alias agentClaudeShell="$DEVCONTAINERS/claude-code/run.sh --shell"
+alias agentClaudeBuild="$DEVCONTAINERS/claude-code/run.sh --build"
 
 # Kiro CLI
 alias agentKiro="$DEVCONTAINERS/kiro-cli/run.sh"
@@ -104,7 +104,7 @@ agentKiroShell                       # Shell into the Kiro container
 ## Project structure
 
 ```
-Claude/            — Claude Code dev container
+claude-code/       — Claude Code dev container
   Dockerfile
   entrypoint.sh
   init-firewall.sh
@@ -129,4 +129,4 @@ To add a new agent container, copy an existing one and adapt the install steps, 
 
 ## License
 
-This project is provided as-is, without warranty. Use at your own risk.
+This project is licensed under the [MIT License](./LICENSE). It is provided as-is, without warranty. Use at your own risk.
