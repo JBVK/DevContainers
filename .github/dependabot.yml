@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directory: "/claude-code"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/kiro-cli"
+    schedule:
+      interval: "weekly"
